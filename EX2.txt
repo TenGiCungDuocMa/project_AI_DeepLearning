@@ -34,6 +34,8 @@ CREATE TABLE CT_DDH (
 	MaNGK VARCHAR(6),
 	SLDat INT,
 	PRIMARY KEY (SoDDH,MaNGK),
+	FOREIGN KEY (SoDDH) REFERENCES DDH(SoDDH),
+	FOREIGN KEY (MaNGK) REFERENCES NGK(MaNGK),
 );
 
 CREATE TABLE PHIEUGH (
@@ -48,6 +50,8 @@ CREATE TABLE CT_PGH (
 	SLGiao INT,
 	DGGiao MONEY,
 	PRIMARY KEY (SoPGH,MaNGK),
+	FOREIGN KEY (SoPGH) REFERENCES PHIEUGH(SoPGH),
+	FOREIGN KEY (MaNGK) REFERENCES NGK(MaNGK),
 );
 
 CREATE TABLE HOADON (
@@ -62,6 +66,8 @@ CREATE TABLE CT_HOADON (
 	SLKHMua INT,
 	DGBan MONEY,
 	PRIMARY KEY (SoHD,MaNGK),
+	FOREIGN KEY (SoHD) REFERENCES HOADON(SoHD),
+	FOREIGN KEY (MaNGK) REFERENCES NGK(MaNGK),
 );
 
 CREATE TABLE PHIEUHEN (
@@ -76,6 +82,8 @@ CREATE TABLE CT_PH (
 	MaNGK VARCHAR(6),
 	SLHen INT,
 	PRIMARY KEY (SoPH, MaNGK),
+	FOREIGN KEY (SoPH) REFERENCES PHIEUHEN(SoPH),
+	FOREIGN KEY (MaNGK) REFERENCES NGK(MaNGK),
 );
 
 CREATE TABLE PHIEUTRANO (
@@ -267,7 +275,7 @@ VALUES ('PH03','SV2',12);
 INSERT INTO CT_PH(SoPH, MaNGK,SLHen)
 VALUES ('PH03','CC2',9);
 INSERT INTO CT_PH(SoPH, MaNGK,SLHen)
-VALUES ('PH04','PS2',15);
+VALUES ('PH02','PS2',15);
 
 /*INSERT TABLE PHIEUTRANO*/
 INSERT INTO PHIEUTRANO(SoPTN,NgayTra,SoTienTra,SoHD)
@@ -280,3 +288,119 @@ INSERT INTO PHIEUTRANO(SoPTN,NgayTra,SoTienTra,SoHD)
 VALUES ('PTN04','15/6/2010',1020000,'HD03');
 INSERT INTO PHIEUTRANO(SoPTN,NgayTra,SoTienTra,SoHD)
 VALUES ('PTN05','01/7/2010',1080000,'HD03');
+
+/*1) Liệt kê các NGK và loại NGK tương ứng.*/
+USE EX2
+GO
+SELECT *
+FROM NGK INNER JOIN LOAINGK ON NGK.MaLoaiNGK = LOAINGK.MaLoaiNGK;
+/*2) Cho biết thông tin về nhà cung cấp ở Thành phố HCM.*/
+USE EX2
+GO
+SELECT *
+FROM NHACC 
+WHERE DiaChiNCC LIKE '%TP.HCM%';
+/*3) Liệt kê các hóa đơn mua hàng trong tháng 5/2010.*/
+USE EX2
+GO 
+SELECT *
+FROM HOADON
+WHERE (MONTH(NgaylapHD) = 5) AND (YEAR(NgaylapHD) = 2010);
+/*4) Cho biết tên các nhà cung cấp có cung cấp NGK ‘Coca Cola’.*/
+USE EX2
+GO
+SELECT DISTINCT NHACC.TENNCC
+FROM NHACC INNER JOIN LOAINGK ON NHACC.MaNCC = LOAINGK.MaNCC
+		INNER JOIN NGK ON NGK.MaLoaiNGK = LOAINGK.MaLoaiNGK
+WHERE NGK.TenNGK ='Coca Cola';
+/*5) Cho biết tên các nhà cung cấp có thể cung cấp nhiều loại NGK nhất.*/
+USE EX2
+GO
+SELECT NHACC.TenNCC, COUNT(NGK.MALOAINGK) AS SO_LUONG
+FROM NHACC INNER JOIN LOAINGK ON NHACC.MaNCC = LOAINGK.MaNCC
+		INNER JOIN NGK ON NGK.MaLoaiNGK = LOAINGK.MaLoaiNGK
+GROUP BY NHACC.TenNCC
+HAVING COUNT(NGK.MALOAINGK) >= ALL (SELECT COUNT(NGK.MALOAINGK)
+									FROM NHACC INNER JOIN LOAINGK ON NHACC.MaNCC = LOAINGK.MaNCC
+											INNER JOIN NGK ON NGK.MaLoaiNGK = LOAINGK.MaLoaiNGK
+									GROUP BY NHACC.TenNCC);
+/*6) Cho biết tên nhà cung cấp không có khả năng cung cấp NGK có tên ‘Pepsi’.*/
+USE EX2
+GO
+SELECT DISTINCT NHACC.TenNCC
+FROM NHACC 
+WHERE NHACC.TenNCC NOT IN (SELECT NHACC.TenNCC
+						FROM NHACC INNER JOIN LOAINGK ON NHACC.MaNCC = LOAINGK.MaNCC
+									INNER JOIN NGK ON NGK.MaLoaiNGK = LOAINGK.MaLoaiNGK
+						WHERE NGK.TenNGK = 'Pepsi');
+/*7) Hiển thị thông tin của NGK chưa bán được.*/
+USE EX2
+GO
+SELECT *
+FROM NGK
+WHERE (MaNGK NOT IN (
+	SELECT NGK.MaNGK
+	FROM NGK INNER JOIN CT_DDH ON NGK.MaNGK = CT_DDH.MaNGK
+))AND(MaNGK NOT IN (
+	SELECT NGK.MaNGK
+	FROM NGK INNER JOIN CT_HOADON ON NGK.MaNGK = CT_HOADON.MaNGK
+))AND(MaNGK NOT IN (
+	SELECT NGK.MaNGK
+	FROM NGK INNER JOIN CT_PGH ON NGK.MaNGK = CT_PGH.MaNGK
+))AND(MaNGK NOT IN (
+	SELECT NGK.MaNGK
+	FROM NGK INNER JOIN CT_PH ON NGK.MaNGK = CT_PH.MaNGK
+));
+/*8) Hiển thị tên và tổng số lượng bán của từng NGK.*/
+USE EX2
+GO
+(
+SELECT NGK.MaNGK, SUM(CT_DDH.SLDat) AS SL
+FROM NGK INNER JOIN CT_DDH ON NGK.MaNGK = CT_DDH.MaNGK
+GROUP BY NGK.MaNGK
+UNION
+SELECT NGK.MaNGK, SUM(CT_HOADON.SLKHMua) AS SL
+FROM NGK INNER JOIN CT_HOADON ON NGK.MaNGK = CT_HOADON.MaNGK
+GROUP BY NGK.MaNGK
+UNION
+SELECT NGK.MaNGK, SUM(CT_PGH.SLGiao) AS SL
+FROM NGK INNER JOIN CT_PGH ON NGK.MaNGK = CT_PGH.MaNGK
+GROUP BY NGK.MaNGK
+UNION
+SELECT NGK.MaNGK, SUM(CT_PH.SLHen) AS SL
+FROM NGK INNER JOIN CT_PH ON NGK.MaNGK = CT_PH.MaNGK
+GROUP BY NGK.MaNGK
+);
+/*9) Hiển thị tên và tổng số lượng của NGK nhập về.*/
+/*10) Hiển thị ĐĐH đã đặt NGK với số lượng nhiều nhất so với các ĐĐH khác có đặt NGK đó. Thông tin 
+hiển thị: SoDDH, MaNGK, [SL đặt nhiều nhất].*/
+/*11) Hiển thị các NGK không được nhập trong tháng 1/2010.*/
+/*12) Hiển thị tên các NGK không bán được trong tháng 6/2010.*/
+/*13) Cho biết cửa hàng bán bao nhiêu thứ NGK.*/
+/*14) Cho biết cửa hàng bán bao nhiêu loại NGK.*/
+/*15) Hiển thị thông tin của khách hàng có giao dịch với cửa hàng nhiều nhất (căn cứ vào số lần mua 
+hàng).*/
+/*16) Tính tổng doanh thu năm 2010 của cửa hàng.*/
+/*17) Liệt kê 5 loại NGK bán chạy nhất (doanh thu) trong tháng 5/2010.*/
+/*18) Liệt kê thông tin bán NGK của tháng 5/2010. Thông tin hiển thị: Mã NGK, Tên NGK, SL bán.*/
+/*19) Liệt kê thông tin của NGK có nhiều người mua nhất.*/
+/*20) Hiển thị ngày nhập hàng gần nhất của cửa hàng.*/
+/*21) Cho biết số lần mua hàng của khách có mã là ‘KH001’.*/
+/*22) Cho biết tổng tiền của từng hóa đơn.*/
+/*23) Cho biết danh sách các hóa đơn gồm SoHD, NgaylapHD, MaKH, TenKH và tổng trị giá của từng 
+HoaDon. Danh sách sắp xếp tăng dần theo ngày và giảm dần theo tổng trị giá của hóa đơn.*/
+/*24) Cho biết các hóa đơn có tổng trị giá lớn hơn tổng trị giá trung bình của các hóa đơn trong ngày 
+18/06/2010.*/
+/*25) Cho biết số lượng từng NGK tiêu thụ theo từng tháng của năm 2010.*/
+/*26) Đưa ra danh sách NGK chưa được bán trong tháng 9 năm 2010.*/
+/*27) Đưa ra danh sách khách hàng có địa chỉ ở TP.HCM và từng mua NGK trong tháng 9 năm 2010.*/
+/*28) Đưa ra số lượng đã bán tương ứng của từng NGK trong tháng 10 năm 2010.*/
+/*29) Hiển thị thông tin khách hàng đã từng mua và tổng số lượng của từng NGK tại cửa hàng.*/
+/*30) Cho biết trong năm 2010, khách hàng nào đã mua nợ nhiều nhất.*/
+/*31) Có bao nhiêu hóa đơn chưa thanh toán hết số tiền?*/
+/*32) Liệt kê các hóa đơn cùng tên của khách hàng tương ứng đã mua NGK và thanh toán tiền đầy đủ 1 
+lần. (Không có phiếu trả nợ)*/
+/*33) Thông kê cho biết thông tin đặt hàng của cửa hàng trong năm 2010: Mã NGK, Tên NGK, Tổng SL 
+đặt*/
+/*34) Để thuận tiện trong việc tặng quà Tết cho khách hàng, hãy liệt kê danh sách khách
+hàng đã mua NGK với tổng số tiền tương ứng trong năm 2010 (hiển thị giảm dần theo số tiền đã mua)*/
